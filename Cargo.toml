@@ -1,0 +1,20 @@
+[package]
+name = "esp_rhai"
+version = "0.1.0"
+authors = ["Scott Mabin <scott@mabez.dev>"]
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+esp32c3-hal = "0.5.0"
+esp-alloc = { version = "0.1.0", features = ["oom-handler"] }
+esp-backtrace = { version = "0.4.0", features = ["esp32c3", "panic-handler", "print-uart"] }
+riscv-rt = { version = "0.11", optional = true }
+esp-println = { version = "0.3.1", features = ["esp32c3"] }
+heapless = "0.7.16"
+rhai = { version = "1", default-features = false, features = ["no_std"]}
+libm = "0.2.6"
+
+[features]
+default = ["rt"]
+rt = ["riscv-rt"]
