@@ -2,13 +2,23 @@
 #![no_main]
 
 extern crate alloc;
+use core::fmt::Write;
 use esp32c3_hal::{
-    clock::ClockControl, peripherals::Peripherals, prelude::{*, nb::block}, timer::TimerGroup, Rtc, UsbSerialJtag,
+    clock::ClockControl,
+    peripherals::Peripherals,
+    prelude::{nb::block, *},
+    timer::TimerGroup,
+    Rtc,
 };
 use esp_backtrace as _;
-use esp_println::println;
+use esp_println::{print, println};
 use heapless::String;
 use rhai::{Engine, INT};
+
+#[cfg(feature = "uart0")]
+use esp32c3_hal::Uart;
+#[cfg(feature = "usb-serial-jtag")]
+use esp32c3_hal::UsbSerialJtag;
 
 #[global_allocator]
 static ALLOCATOR: esp_alloc::EspHeap = esp_alloc::EspHeap::empty();
@@ -46,7 +56,10 @@ fn main() -> ! {
     wdt0.disable();
     wdt1.disable();
 
+    #[cfg(feature = "usb-serial-jtag")]
     let mut x = UsbSerialJtag::new(peripherals.USB_DEVICE);
+    #[cfg(feature = "uart0")]
+    let mut x = Uart::new(peripherals.UART0);
 
     let mut buffer = String::<1024>::new();
 
@@ -55,47 +68,54 @@ fn main() -> ! {
     engine.register_fn("print", print);
     engine.register_fn("debug", debug); // this doesn't seem to be possible sadly :(
     engine.on_print(|s: &str| -> () { println!("{s}") });
-    // run abitrary scripts
-    engine.run(r#"
-        print("hello, world!");
-        let x = 12;
-        let y = 44;
-        let result = x * y;
-        print(`${x} * ${y} = ${result}`);
-    "#).unwrap();
 
+    // // run abitrary scripts
+    // engine.run(r#"
+    //     print("hello, world!");
+    //     let x = 12;
+    //     let y = 44;
+    //     let result = x * y;
+    //     print(`${x} * ${y} = ${result}`);
+    // "#).unwrap();
+
+    write!(x, "esp-rhai repl - v{}\n>>> ", env!("CARGO_PKG_VERSION")).ok();
+    block!(x.flush()).unwrap();
     loop {
         let c = block!(x.read()).unwrap();
         block!(x.write(c)).unwrap();
 
         let mut execute = false;
-
         if c == 8 {
             buffer.pop(); // delete last
         } else if c == b'\r' {
             if buffer.len() > 0 {
                 execute = true; // enter
             } else {
-                println!(">>> ");
+                write!(x, "\n>>> ").unwrap();
             }
         } else {
             buffer.push(c as char).unwrap();
         }
-        
+
         if execute {
-            println!("Command: {}", buffer);
             match buffer.as_bytes() {
-                [b'c',b'a',b'l',b'c', ..] => match engine.eval_expression::<INT>(&buffer[4..]) {
-                    Ok(res) => println!(">>> {}", res),
-                    Err(e) => println!("{:?}", e)
+                [b'c', b'a', b'l', b'c', ..] => match engine.eval_expression::<INT>(&buffer[4..]) {
+                    Ok(res) => write!(x, "\n{res}\n").unwrap(),
+                    Err(e) => writeln!(x, "\n{:?}\n", e).unwrap(),
                 },
-                _ => match engine.eval_expression::<()>(&buffer[..]) {
-                    Ok(_) => println!(">>> "),
-                    Err(e) => println!("{:?}", e)
+                _ => {
+                    writeln!(x).unwrap();
+                    match engine.eval_expression::<()>(&buffer[..]) {
+                        Ok(_) => {}
+                        Err(e) => writeln!(x, "{e:?}\n").unwrap(),
+                    }
                 }
             }
+            print!(">>> ");
             buffer.clear();
         }
+
+        block!(x.flush()).unwrap();
     }
 }
 
@@ -110,7 +130,6 @@ fn print(s: &str) -> &str {
 fn debug(d: &dyn core::fmt::Debug) {
     println!("{:?}", d);
 }
-
 
 #[no_mangle]
 pub extern "C" fn fmod(x: f64, y: f64) -> f64 {

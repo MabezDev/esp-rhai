@@ -12,9 +12,11 @@ esp-backtrace = { version = "0.4.0", features = ["esp32c3", "panic-handler", "pr
 riscv-rt = { version = "0.11", optional = true }
 esp-println = { version = "0.3.1", features = ["esp32c3"] }
 heapless = "0.7.16"
-rhai = { version = "1", default-features = false, features = ["no_std"]}
+rhai = { version = "1", default-features = false, features = ["no_std", "no_float", "no_module", "only_i32", "no_optimize"]}
 libm = "0.2.6"
 
 [features]
-default = ["rt"]
+default = ["rt", "usb-serial-jtag"]
 rt = ["riscv-rt"]
+uart0 = []
+usb-serial-jtag = []
