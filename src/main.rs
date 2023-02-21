@@ -67,13 +67,14 @@ fn main() -> ! {
     let bsp = BasicStringPackage::new();
     bsp.register_into_engine(&mut engine); // has print and debug
 
-    engine.register_fn("heap", heap);
-    engine.register_fn("heap_stats", heap_stats);
     engine.on_debug(move |s, src, pos| {
         let src = src.unwrap_or("unknown");
         println!("DEBUG of {src} at {pos:?}: {s}");
     });
     engine.on_print(|s: &str| { println!("{s}") });
+
+    // custom functions
+    engine.register_fn("heap", heap);
 
     // run abitrary scripts
     println!("Running example script...");
@@ -128,10 +129,6 @@ fn main() -> ! {
 
 fn heap() {
     println!("used = {}, free = {}", ALLOCATOR.used(), ALLOCATOR.free())
-}
-
-fn heap_stats() -> (usize, usize) {
-    (ALLOCATOR.used(), ALLOCATOR.free())
 }
 
 #[no_mangle]
