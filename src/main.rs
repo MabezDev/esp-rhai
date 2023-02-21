@@ -67,7 +67,7 @@ fn main() -> ! {
     engine.register_fn("heap", heap);
     engine.register_fn("print", print);
     engine.register_fn("debug", debug); // this doesn't seem to be possible sadly :(
-    engine.on_print(|s: &str| -> () { println!("{s}") });
+    engine.on_print(|s: &str| { println!("{s}") });
 
     // // run abitrary scripts
     // engine.run(r#"
@@ -101,7 +101,7 @@ fn main() -> ! {
             match buffer.as_bytes() {
                 [b'c', b'a', b'l', b'c', ..] => match engine.eval_expression::<INT>(&buffer[4..]) {
                     Ok(res) => write!(x, "\n{res}\n").unwrap(),
-                    Err(e) => writeln!(x, "\n{:?}\n", e).unwrap(),
+                    Err(e) => writeln!(x, "\n{e:?}\n").unwrap(),
                 },
                 _ => {
                     writeln!(x).unwrap();
