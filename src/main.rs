@@ -13,7 +13,7 @@ use esp32c3_hal::{
 use esp_backtrace as _;
 use esp_println::{print, println};
 use heapless::String;
-use rhai::{Engine, INT};
+use rhai::{Engine, INT, packages::{BasicStringPackage, Package}};
 
 #[cfg(feature = "uart0")]
 use esp32c3_hal::Uart;
@@ -64,21 +64,28 @@ fn main() -> ! {
     let mut buffer = String::<1024>::new();
 
     let mut engine = Engine::new_raw();
+    let bsp = BasicStringPackage::new();
+    bsp.register_into_engine(&mut engine); // has print and debug
+
     engine.register_fn("heap", heap);
-    engine.register_fn("print", print);
-    engine.register_fn("debug", debug); // this doesn't seem to be possible sadly :(
+    engine.register_fn("heap_stats", heap_stats);
+    engine.on_debug(move |s, src, pos| {
+        let src = src.unwrap_or("unknown");
+        println!("DEBUG of {src} at {pos:?}: {s}");
+    });
     engine.on_print(|s: &str| { println!("{s}") });
 
-    // // run abitrary scripts
-    // engine.run(r#"
-    //     print("hello, world!");
-    //     let x = 12;
-    //     let y = 44;
-    //     let result = x * y;
-    //     print(`${x} * ${y} = ${result}`);
-    // "#).unwrap();
+    // run abitrary scripts
+    println!("Running example script...");
+    engine.run(r#"
+        print("hello, world!");
+        let x = 12;
+        let y = 44;
+        let result = x * y;
+        print(`${x} * ${y} = ${result}`);
+    "#).unwrap();
 
-    write!(x, "esp-rhai repl - v{}\n>>> ", env!("CARGO_PKG_VERSION")).ok();
+    write!(x, "\nesp-rhai repl - v{}\n>>> ", env!("CARGO_PKG_VERSION")).ok();
     block!(x.flush()).unwrap();
     loop {
         let c = block!(x.read()).unwrap();
@@ -123,12 +130,8 @@ fn heap() {
     println!("used = {}, free = {}", ALLOCATOR.used(), ALLOCATOR.free())
 }
 
-fn print(s: &str) -> &str {
-    s
-}
-
-fn debug(d: &dyn core::fmt::Debug) {
-    println!("{:?}", d);
+fn heap_stats() -> (usize, usize) {
+    (ALLOCATOR.used(), ALLOCATOR.free())
 }
 
 #[no_mangle]
